@@ -34,6 +34,7 @@ def login():
 
 @app.route('/callback')
 def callback():
+    print("HIT /callback ✅")
     code = request.args.get('code')
     token_info = sp_oauth.get_access_token(code)
     session['token_info'] = token_info  # ✅ Save token in session
@@ -100,6 +101,10 @@ def get_playlist(mood):
             })
 
     return matched_tracks if matched_tracks else f"No tracks found for mood: {mood}", 200
+
+@app.route('/ping')
+def ping():
+    return "App is alive!"
 
 if __name__ == '__main__':
     app.run(debug=True)
