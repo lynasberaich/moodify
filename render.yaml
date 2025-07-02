@@ -10,6 +10,6 @@ services:
       - key: SPOTIPY_CLIENT_SECRET
         value: ef0ab8129cba4852948fb4c16ea2b47d
       - key: SPOTIPY_REDIRECT_URI
-        value: https://moodify.onrender.com/callback
+        value: https://moodify-0w8i.onrender.com/callback
 
 
