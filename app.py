@@ -3,11 +3,15 @@ from flask import Flask, request, redirect, session, url_for
 from spotipy import Spotify
 from spotipy.oauth2 import SpotifyOAuth
 from dotenv import load_dotenv
+from spotipy.cache_handler import FlaskSessionCacheHandler
 
 load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.urandom(64)
+
+#manages the session
+cache_handler = FlaskSessionCacheHandler(session)
 
 sp_oauth = SpotifyOAuth(
     client_id=os.getenv("SPOTIPY_CLIENT_ID"),
@@ -16,45 +20,34 @@ sp_oauth = SpotifyOAuth(
     scope="user-library-read user-top-read user-read-private"
 )
 
-def get_token():
-    token_info = session.get('token_info', None)
-    if not token_info:
-        return None
-
-    if sp_oauth.is_token_expired(token_info):
-        token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
-        session['token_info'] = token_info
-    return token_info
 
 
 @app.route('/')
-def login():
-    auth_url = sp_oauth.get_authorize_url()
-    return redirect(auth_url)
+def home():
+    #check to see if they are logged in
+    if not sp_oauth.validate_token(cache_handler.get_cached_token()):
+        #get them to log in
+        auth_url = sp_oauth.get_authorize_url()
+        return redirect(auth_url)
+    return redirect(url_for('get_playlist', mood="happy"))
 
+#create endpoint where redirect happens
 @app.route('/callback')
 def callback():
-    print("HIT /callback ✅")
-    code = request.args.get('code')
-    token_info = sp_oauth.get_access_token(code)
-    session['token_info'] = token_info  # ✅ Save token in session
-    access_token = token_info['access_token']
-
-    sp = Spotify(auth=access_token)
-    user = sp.current_user()
-    #return f"Logged in as {user['display_name']}"
-    return redirect(url_for('get_playlist', mood='happy'))
+    sp_oauth.get_access_token(request.args['code'])
+    return redirect(url_for('get_playlist', mood="happy"))
 
 
 @app.route('/get_playlist/<mood>')
 def get_playlist(mood):
 
-    #re-autheticate, use a token cache
-    token_info = get_token()
-    if not token_info:
-        return redirect('/')
+    #check to see if they are logged in
+    if not sp_oauth.validate_token(cache_handler.get_cached_token()):
+        #get them to log in
+        auth_url = sp_oauth.get_authorize_url()
+        return redirect(auth_url)
     
-    sp = Spotify(auth=token_info['access_token'])
+    sp = Spotify(auth_manager=sp_oauth, cache_handler=cache_handler)
 
     test_id = "11dFghVXANMlKmJXsNCbNl"  # This is a known public track (by Daft Punk)
     test_feature = sp.audio_features([test_id])
@@ -105,6 +98,13 @@ def get_playlist(mood):
 @app.route('/ping')
 def ping():
     return "App is alive!"
+
+#logout endpoint
+@app.route('/logout')
+
+def logout():
+    session.clear()
+    return redirect(url_for('home'))
 
 if __name__ == '__main__':
     app.run(debug=True)
