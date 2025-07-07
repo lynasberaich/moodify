@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request, redirect, session, url_for
+from flask import Flask, request, redirect, session, url_for, render_template
 from spotipy import Spotify
 from spotipy.oauth2 import SpotifyOAuth
 from dotenv import load_dotenv
@@ -47,6 +47,7 @@ def get_playlist(mood):
         auth_url = sp_oauth.get_authorize_url()
         return redirect(auth_url)
     
+    #then create our instance
     sp = Spotify(auth_manager=sp_oauth, cache_handler=cache_handler)
 
     test_id = "11dFghVXANMlKmJXsNCbNl"  # This is a known public track (by Daft Punk)
@@ -101,7 +102,6 @@ def ping():
 
 #logout endpoint
 @app.route('/logout')
-
 def logout():
     session.clear()
     return redirect(url_for('home'))
