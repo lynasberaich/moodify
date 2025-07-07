@@ -47,16 +47,24 @@ def home():
 @app.route('/callback')
 def callback():
     try:
+        print("🎯 HIT /callback")
         auth_manager = get_auth_manager()
-        auth_manager.get_access_token(request.args['code'])
+        code = request.args.get('code')
+        print("🔑 Got code:", code)
+
+        token = auth_manager.get_access_token(code)
+        print("✅ Got token:", token)
+
         return redirect(url_for('get_playlist', mood="happy"))
     except Exception as e:
         print("❌ error in /callback:", e)
         return "callback failed :(", 500
 
 
+
 @app.route('/get_playlist/<mood>')
 def get_playlist(mood):
+    print("🎵 HIT /get_playlist with mood:", mood)
     auth_manager = get_auth_manager()
     #check to see if they are logged in
     if not auth_manager.validate_token(auth_manager.cache_handler.get_cached_token()):
@@ -64,6 +72,7 @@ def get_playlist(mood):
         return redirect(auth_manager.get_authorize_url())
     
     #then create our instance
+    print("🧠 Building Spotify client...")
     sp = Spotify(auth_manager=auth_manager)
 
 
@@ -75,6 +84,7 @@ def get_playlist(mood):
 
         #get top 50 tracks
         top_tracks = sp.current_user_top_tracks(limit=20)['items']
+        print("🎶 Pulled top tracks:", len(top_tracks))
 
         #get audio features for these tracks
         track_ids = [track['id'] for track in top_tracks if track.get('id')]
