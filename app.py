@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request, redirect, session, url_for, render_template
+from flask import Flask, request, redirect, session, url_for, render_template, has_request_context
 from spotipy import Spotify
 from spotipy.oauth2 import SpotifyOAuth
 from dotenv import load_dotenv
@@ -24,6 +24,9 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", "fallback-key")
 
 # create these per-request
 def get_auth_manager():
+    if not has_request_context():
+        raise RuntimeError("Tried to access session outside of request context")
+    
     return SpotifyOAuth(
         client_id=os.getenv("SPOTIPY_CLIENT_ID"),
         client_secret=os.getenv("SPOTIPY_CLIENT_SECRET"),
