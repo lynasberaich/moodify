@@ -8,7 +8,9 @@ from spotipy.cache_handler import FlaskSessionCacheHandler
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.urandom(64)
+#app.secret_key = os.urandom(64)
+#using fixed secret key instead
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "fallback-key")
 
 # #manages the session
 # cache_handler = FlaskSessionCacheHandler(session)
