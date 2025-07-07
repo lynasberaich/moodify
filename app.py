@@ -10,91 +10,114 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.urandom(64)
 
-#manages the session
-cache_handler = FlaskSessionCacheHandler(session)
+# #manages the session
+# cache_handler = FlaskSessionCacheHandler(session)
 
-sp_oauth = SpotifyOAuth(
-    client_id=os.getenv("SPOTIPY_CLIENT_ID"),
-    client_secret=os.getenv("SPOTIPY_CLIENT_SECRET"),
-    redirect_uri=os.getenv("SPOTIPY_REDIRECT_URI"),
-    scope="user-library-read user-top-read user-read-private"
-)
+# sp_oauth = SpotifyOAuth(
+#     client_id=os.getenv("SPOTIPY_CLIENT_ID"),
+#     client_secret=os.getenv("SPOTIPY_CLIENT_SECRET"),
+#     redirect_uri=os.getenv("SPOTIPY_REDIRECT_URI"),
+#     scope="user-library-read user-top-read user-read-private"
+# )
+
+# create these per-request
+def get_auth_manager():
+    return SpotifyOAuth(
+        client_id=os.getenv("SPOTIPY_CLIENT_ID"),
+        client_secret=os.getenv("SPOTIPY_CLIENT_SECRET"),
+        redirect_uri=os.getenv("SPOTIPY_REDIRECT_URI"),
+        scope="user-library-read user-top-read user-read-private",
+        cache_handler=FlaskSessionCacheHandler(session),
+        show_dialog=True
+    )
 
 
 
 @app.route('/')
 def home():
+    auth_manager = get_auth_manager()
     #check to see if they are logged in
-    if not sp_oauth.validate_token(cache_handler.get_cached_token()):
+    if not auth_manager.validate_token(auth_manager.cache_handler.get_cached_token()):
         #get them to log in
-        auth_url = sp_oauth.get_authorize_url()
+        auth_url = auth_manager.get_authorize_url()
         return redirect(auth_url)
     return redirect(url_for('get_playlist', mood="happy"))
 
-#create endpoint where redirect happens
+#create endpoint where callback happens
 @app.route('/callback')
 def callback():
-    sp_oauth.get_access_token(request.args['code'])
-    return redirect(url_for('get_playlist', mood="happy"))
+    try:
+        auth_manager = get_auth_manager()
+        auth_manager.get_access_token(request.args['code'])
+        return redirect(url_for('get_playlist', mood="happy"))
+    except Exception as e:
+        print("❌ error in /callback:", e)
+        return "callback failed :(", 500
 
 
 @app.route('/get_playlist/<mood>')
 def get_playlist(mood):
-
+    auth_manager = get_auth_manager()
     #check to see if they are logged in
-    if not sp_oauth.validate_token(cache_handler.get_cached_token()):
-        #get them to log in
-        auth_url = sp_oauth.get_authorize_url()
-        return redirect(auth_url)
+    if not auth_manager.validate_token(auth_manager.cache_handler.get_cached_token()):
+        #otherwise get them to log in
+        return redirect(auth_manager.get_authorize_url())
     
     #then create our instance
-    sp = Spotify(auth_manager=sp_oauth, cache_handler=cache_handler)
-
-    test_id = "11dFghVXANMlKmJXsNCbNl"  # This is a known public track (by Daft Punk)
-    test_feature = sp.audio_features([test_id])
-    print("Test feature:", test_feature)
+    sp = Spotify(auth_manager=auth_manager)
 
 
-    #get top 50 tracks
-    top_tracks = sp.current_user_top_tracks(limit=20)['items']
-
-    #get audio features for these tracks
-    track_ids = [track['id'] for track in top_tracks if track.get('id') is not None]
-    track_ids = [tid for tid in track_ids if tid and tid.strip() != ""]
-    print("Track IDs:", track_ids)
-    features = []
-    for tid in track_ids:
-        try:
-            f = sp.audio_features([tid])[0]
-            if f:  # some may be None
-                features.append(f)
-        except Exception as e:
-            print(f"Skipping {tid} due to error:", e)
+    try:
+        # test_id = "11dFghVXANMlKmJXsNCbNl"  # known public track (by Daft Punk)
+        # test_feature = sp.audio_features([test_id])
+        # print("Test feature:", test_feature)
 
 
-    #mood rules
-    MOOD_RULES = {
-        'happy': lambda f: f['valence'] > 0.7 and f['energy'] > 0.7,
-        'sad': lambda f: f['valence'] < 0.3 and f['energy'] < 0.3,
-        'chill': lambda f: f['valence'] > 0.5 and f['energy'] < 0.5,
-        'energetic': lambda f: f['valence'] > 0.6 and f['energy'] > 0.6,
-        'romantic': lambda f: f['valence'] > 0.6 and f['danceability'] > 0.6,
-    }
+        #get top 50 tracks
+        top_tracks = sp.current_user_top_tracks(limit=20)['items']
 
-    if mood not in MOOD_RULES:
-        return f"Unknown mood: {mood}", 400
+        #get audio features for these tracks
+        track_ids = [track['id'] for track in top_tracks if track.get('id')]
+        #track_ids = [tid for tid in track_ids if tid and tid.strip() != ""]
+        #print("Track IDs:", track_ids)
+        features = []
+        for tid in track_ids:
+            try:
+                f = sp.audio_features([tid])[0]
+                if f:  # some may be None
+                    features.append(f)
+            except Exception as e:
+                print(f"Skipping {tid} due to error:", e)
+
+
+        #mood rules
+        MOOD_RULES = {
+            'happy': lambda f: f['valence'] > 0.7 and f['energy'] > 0.7,
+            'sad': lambda f: f['valence'] < 0.3 and f['energy'] < 0.3,
+            'chill': lambda f: f['valence'] > 0.5 and f['energy'] < 0.5,
+            'energetic': lambda f: f['valence'] > 0.6 and f['energy'] > 0.6,
+            'romantic': lambda f: f['valence'] > 0.6 and f['danceability'] > 0.6,
+        }
+
+        if mood not in MOOD_RULES:
+            return f"Unknown mood: {mood}", 400
+        
+        matched_tracks = []
+        for track, feature in zip(top_tracks, features):
+            if feature and MOOD_RULES[mood](feature):
+                matched_tracks.append({
+                    'name': track['name'],
+                    'artist': track['artists'][0]['name'],
+                    'preview_url': track['preview_url'],
+                    'external_url': track['external_urls']['spotify']
+                })
+
+        return matched_tracks if matched_tracks else f"No tracks found for mood: {mood}", 200
     
-    matched_tracks = []
-    for track, feature in zip(top_tracks, features):
-        if feature and MOOD_RULES[mood](feature):
-            matched_tracks.append({
-                'name': track['name'],
-                'artist': track['artists'][0]['name'],
-                'preview_url': track['preview_url'],
-                'external_url': track['external_urls']['spotify']
-            })
-
-    return matched_tracks if matched_tracks else f"No tracks found for mood: {mood}", 200
+    except Exception as e:
+        print("error in /get_playlist: ", e)
+        return "error loading playlist", 500
+    
 
 @app.route('/ping')
 def ping():
