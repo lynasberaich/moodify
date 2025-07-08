@@ -162,18 +162,23 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", "fallback-key")
 from flask import has_request_context
 
 def get_auth_manager():
-    if not has_request_context():
-        print("🚫 Tried to access session outside request context")
+    try:
+        if not has_request_context():
+            print("🚫 No request context — cannot use session")
+            return None
+
+        return SpotifyOAuth(
+            client_id=os.getenv("SPOTIPY_CLIENT_ID"),
+            client_secret=os.getenv("SPOTIPY_CLIENT_SECRET"),
+            redirect_uri=os.getenv("SPOTIPY_REDIRECT_URI"),
+            scope="user-library-read user-top-read user-read-private",
+            cache_handler=FlaskSessionCacheHandler(session),
+            show_dialog=True
+        )
+    except Exception as e:
+        print("❌ Failed to create SpotifyOAuth:", e)
         return None
 
-    return SpotifyOAuth(
-        client_id=os.getenv("SPOTIPY_CLIENT_ID"),
-        client_secret=os.getenv("SPOTIPY_CLIENT_SECRET"),
-        redirect_uri=os.getenv("SPOTIPY_REDIRECT_URI"),
-        scope="user-library-read user-top-read user-read-private",
-        cache_handler=FlaskSessionCacheHandler(session),
-        show_dialog=True
-    )
 
 
 @app.route("/")
@@ -187,20 +192,24 @@ def home():
 @app.route("/callback")
 def callback():
     print("🎯 HIT /callback")
-    auth_manager = get_auth_manager()
-
-    if not auth_manager:
-        return "Failed to get auth manager", 500
 
     try:
         code = request.args.get("code")
-        print("🔑 Got code:", code)
+        print("🔑 Received code:", code)
 
-        auth_manager.get_access_token(code)
-        print("✅ Got token")
+        auth_manager = get_auth_manager()
+
+        if not auth_manager:
+            print("⚠️ Auth manager is None — request context issue?")
+            return "Failed to initialize SpotifyOAuth", 500
+
+        token_info = auth_manager.get_access_token(code)
+        print("✅ Token info received:", token_info)
+
         return redirect(url_for("profile"))
+
     except Exception as e:
-        print("❌ Callback error:", e)
+        print("❌ Exception in /callback:", e)
         return "Callback failed", 500
 
 
