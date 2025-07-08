@@ -147,15 +147,65 @@
 # if __name__ == '__main__':
 #     app.run(debug=True)
 
-from flask import Flask
+import os
+from flask import Flask, redirect, request, session, url_for
+from dotenv import load_dotenv
+from spotipy import Spotify
+from spotipy.oauth2 import SpotifyOAuth
+from spotipy.cache_handler import FlaskSessionCacheHandler
+
+load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = "test123"  # avoid os.urandom on every deploy
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "fallback-key")
+
+def get_auth_manager():
+    return SpotifyOAuth(
+        client_id=os.getenv("SPOTIPY_CLIENT_ID"),
+        client_secret=os.getenv("SPOTIPY_CLIENT_SECRET"),
+        redirect_uri=os.getenv("SPOTIPY_REDIRECT_URI"),
+        scope="user-library-read user-top-read user-read-private",
+        cache_handler=FlaskSessionCacheHandler(session),
+        show_dialog=True
+    )
 
 @app.route("/")
-def index():
-    return "Moodify is alive!"
+def home():
+    print("🔁 HIT /")
+    auth_manager = get_auth_manager()
+    if not auth_manager.validate_token(auth_manager.cache_handler.get_cached_token()):
+        return redirect(auth_manager.get_authorize_url())
+    return redirect(url_for("profile"))
+
+@app.route("/callback")
+def callback():
+    print("🎯 HIT /callback")
+    try:
+        code = request.args.get("code")
+        auth_manager = get_auth_manager()
+        auth_manager.get_access_token(code)
+        print("✅ Token stored")
+        return redirect(url_for("profile"))
+    except Exception as e:
+        print("❌ Callback error:", e)
+        return "Callback failed", 500
+
+@app.route("/profile")
+def profile():
+    print("🧠 HIT /profile")
+    auth_manager = get_auth_manager()
+    if not auth_manager.validate_token(auth_manager.cache_handler.get_cached_token()):
+        return redirect(auth_manager.get_authorize_url())
+    
+    sp = Spotify(auth_manager=auth_manager)
+    user = sp.current_user()
+    return {
+        "display_name": user.get("display_name"),
+        "id": user.get("id"),
+        "email": user.get("email")
+    }
 
 @app.route("/ping")
 def ping():
     return "pong"
+
