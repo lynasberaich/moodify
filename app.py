@@ -148,7 +148,7 @@
 #     app.run(debug=True)
 
 import os
-from flask import Flask, redirect, request, session, url_for
+from flask import Flask, redirect, request, session, url_for, has_request_context
 from dotenv import load_dotenv
 from spotipy import Spotify
 from spotipy.oauth2 import SpotifyOAuth
@@ -159,7 +159,13 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "fallback-key")
 
+from flask import has_request_context
+
 def get_auth_manager():
+    if not has_request_context():
+        print("🚫 Tried to access session outside request context")
+        return None
+
     return SpotifyOAuth(
         client_id=os.getenv("SPOTIPY_CLIENT_ID"),
         client_secret=os.getenv("SPOTIPY_CLIENT_SECRET"),
@@ -168,6 +174,7 @@ def get_auth_manager():
         cache_handler=FlaskSessionCacheHandler(session),
         show_dialog=True
     )
+
 
 @app.route("/")
 def home():
@@ -180,15 +187,22 @@ def home():
 @app.route("/callback")
 def callback():
     print("🎯 HIT /callback")
+    auth_manager = get_auth_manager()
+
+    if not auth_manager:
+        return "Failed to get auth manager", 500
+
     try:
         code = request.args.get("code")
-        auth_manager = get_auth_manager()
+        print("🔑 Got code:", code)
+
         auth_manager.get_access_token(code)
-        print("✅ Token stored")
+        print("✅ Got token")
         return redirect(url_for("profile"))
     except Exception as e:
         print("❌ Callback error:", e)
         return "Callback failed", 500
+
 
 @app.route("/profile")
 def profile():
