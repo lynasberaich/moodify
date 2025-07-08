@@ -147,88 +147,176 @@
 # if __name__ == '__main__':
 #     app.run(debug=True)
 
+
+#NEW CODE
+
+# import os
+# from flask import Flask, redirect, request, session, url_for, has_request_context
+# from dotenv import load_dotenv
+# from spotipy import Spotify
+# from spotipy.oauth2 import SpotifyOAuth
+# from spotipy.cache_handler import FlaskSessionCacheHandler
+
+# load_dotenv()
+
+# app = Flask(__name__)
+# app.secret_key = os.getenv("FLASK_SECRET_KEY", "fallback-key")
+
+# from flask import has_request_context
+
+# def get_auth_manager():
+#     try:
+#         if not has_request_context():
+#             print("🚫 No request context — cannot use session")
+#             return None
+
+#         return SpotifyOAuth(
+#             client_id=os.getenv("SPOTIPY_CLIENT_ID"),
+#             client_secret=os.getenv("SPOTIPY_CLIENT_SECRET"),
+#             redirect_uri=os.getenv("SPOTIPY_REDIRECT_URI"),
+#             scope="user-library-read user-top-read user-read-private",
+#             cache_handler=FlaskSessionCacheHandler(session),
+#             show_dialog=True
+#         )
+#     except Exception as e:
+#         print("❌ Failed to create SpotifyOAuth:", e)
+#         return None
+
+
+
+# @app.route("/")
+# def home():
+#     print("🔁 HIT /")
+#     auth_manager = get_auth_manager()
+#     if not auth_manager.validate_token(auth_manager.cache_handler.get_cached_token()):
+#         return redirect(auth_manager.get_authorize_url())
+#     return redirect(url_for("profile"))
+
+# @app.route("/callback")
+# def callback():
+#     print("🎯 HIT /callback")
+
+#     try:
+#         code = request.args.get("code")
+#         print("🔑 Received code:", code)
+
+#         auth_manager = get_auth_manager()
+
+#         if not auth_manager:
+#             print("⚠️ Auth manager is None — request context issue?")
+#             return "Failed to initialize SpotifyOAuth", 500
+
+#         token_info = auth_manager.get_access_token(code)
+#         print("✅ Token info received:", token_info)
+
+#         return redirect(url_for("profile"))
+
+#     except Exception as e:
+#         print("❌ Exception in /callback:", e)
+#         return "Callback failed", 500
+
+
+# @app.route("/profile")
+# def profile():
+#     print("🧠 HIT /profile")
+#     auth_manager = get_auth_manager()
+#     if not auth_manager.validate_token(auth_manager.cache_handler.get_cached_token()):
+#         return redirect(auth_manager.get_authorize_url())
+    
+#     sp = Spotify(auth_manager=auth_manager)
+#     user = sp.current_user()
+#     return {
+#         "display_name": user.get("display_name"),
+#         "id": user.get("id"),
+#         "email": user.get("email")
+#     }
+
+# @app.route("/ping")
+# def ping():
+#     return "pong"
+
 import os
-from flask import Flask, redirect, request, session, url_for, has_request_context
-from dotenv import load_dotenv
+from flask import Flask, request, redirect, session, url_for, render_template
 from spotipy import Spotify
 from spotipy.oauth2 import SpotifyOAuth
 from spotipy.cache_handler import FlaskSessionCacheHandler
 
-load_dotenv()
-
+#creates the actual web app
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "fallback-key")
 
-from flask import has_request_context
+#used to encrypt session information from users
+app.secret_key = os.urandom(64)
+#app.config['SECRET KEY'] = os.urandom(64)
 
-def get_auth_manager():
-    try:
-        if not has_request_context():
-            print("🚫 No request context — cannot use session")
-            return None
+#from spotify api website
+client_id = '9001e8d19905435598ed117cbb46fd8e'
+client_secret = 'ef0ab8129cba4852948fb4c16ea2b47d'
+redirect_uri = 'https://moodify-0w8i.onrender.com/callback'
+scope = 'playlist-read-private'
 
-        return SpotifyOAuth(
-            client_id=os.getenv("SPOTIPY_CLIENT_ID"),
-            client_secret=os.getenv("SPOTIPY_CLIENT_SECRET"),
-            redirect_uri=os.getenv("SPOTIPY_REDIRECT_URI"),
-            scope="user-library-read user-top-read user-read-private",
-            cache_handler=FlaskSessionCacheHandler(session),
-            show_dialog=True
-        )
-    except Exception as e:
-        print("❌ Failed to create SpotifyOAuth:", e)
-        return None
+#manages the session
+cache_handler = FlaskSessionCacheHandler(session)
+
+#authetication manager
+sp_oauth = SpotifyOAuth(
+    client_id=client_id,
+    client_secret=client_secret,
+    redirect_uri=redirect_uri,
+    scope=scope,  
+    cache_handler=cache_handler,
+    show_dialog=True
+)
+
+#spotify client instance
+sp = Spotify(auth_manager=sp_oauth)
 
 
 
-@app.route("/")
+#we now are going to write out first endpoint
+# allows people to log in and see what parts of their data will be acessed
+#creating homepage
+@app.route('/')
 def home():
-    print("🔁 HIT /")
-    auth_manager = get_auth_manager()
-    if not auth_manager.validate_token(auth_manager.cache_handler.get_cached_token()):
-        return redirect(auth_manager.get_authorize_url())
-    return redirect(url_for("profile"))
+    #check to see if they are logged in
+    if not sp_oauth.validate_token(cache_handler.get_cached_token()):
+        #get them to log in
+        auth_url = sp_oauth.get_authorize_url()
+        return redirect(auth_url)
+    return redirect(url_for('get_playlists'))
 
-@app.route("/callback")
+#create endpoint where redirect happens
+@app.route('/callback')
 def callback():
-    print("🎯 HIT /callback")
+    sp_oauth.get_access_token(request.args['code'])
+    return redirect(url_for('get_playlists'))
 
-    try:
-        code = request.args.get("code")
-        print("🔑 Received code:", code)
-
-        auth_manager = get_auth_manager()
-
-        if not auth_manager:
-            print("⚠️ Auth manager is None — request context issue?")
-            return "Failed to initialize SpotifyOAuth", 500
-
-        token_info = auth_manager.get_access_token(code)
-        print("✅ Token info received:", token_info)
-
-        return redirect(url_for("profile"))
-
-    except Exception as e:
-        print("❌ Exception in /callback:", e)
-        return "Callback failed", 500
-
-
-@app.route("/profile")
-def profile():
-    print("🧠 HIT /profile")
-    auth_manager = get_auth_manager()
-    if not auth_manager.validate_token(auth_manager.cache_handler.get_cached_token()):
-        return redirect(auth_manager.get_authorize_url())
+#create endpoint for actual task at hand: getting the playlists
+@app.route('/get_playlists')
+def get_playlists():
+    #check to see if they are logged in
+    if not sp_oauth.validate_token(cache_handler.get_cached_token()):
+        #get them to log in
+        auth_url = sp_oauth.get_authorize_url()
+        return redirect(auth_url)
     
-    sp = Spotify(auth_manager=auth_manager)
-    user = sp.current_user()
-    return {
-        "display_name": user.get("display_name"),
-        "id": user.get("id"),
-        "email": user.get("email")
-    }
+    playlists = sp.current_user_playlists(limit=8)
+    playlists_info = [(pl['name'], pl['external_urls']['spotify']) for pl in playlists['items']]
+    #playlists_html = '<br>'.join([f'{name}: {url}' for name, url in playlists_info])
 
-@app.route("/ping")
-def ping():
-    return "pong"
+    #in order to update flask route to html page
+    return render_template('playlists.html', playlists=playlists_info)
 
+
+#logout endpoint
+@app.route('/logout')
+
+def logout():
+    session.clear()
+    return redirect(url_for('home'))
+
+
+
+if __name__ == '__main__':
+    # port = int(os.environ.get('PORT', 5000))  # default to 5000 locally
+    # app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(debug=True)
