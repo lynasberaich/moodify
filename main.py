@@ -120,21 +120,24 @@ def generate_playlist():
     print("Track IDs to send:", track_ids)
 
     # Step 3: Call audio_features safely
-    def chunked(iterable, n):
-        for i in range(0, len(iterable), n):
-            yield iterable[i:i + n]
+    # Batch audio features into groups of max 100
+    def get_audio_features_batch(track_ids):
+        features = []
+        for i in range(0, len(track_ids), 100):
+            batch = track_ids[i:i + 100]
+            try:
+                batch_features = sp.audio_features(batch)
+                features.extend(batch_features)
+            except Exception as e:
+                print(f"Error fetching audio features for batch {i // 100 + 1}: {e}")
+        return features
 
-    all_features = []
-    for chunk in chunked(track_ids, 50):
-        try:
-            features = sp.audio_features(tracks=chunk)
-            all_features.extend(features)
-        except Exception as e:
-            print("Chunk failed:", chunk)
-            print("Error:", e)
+    features = get_audio_features_batch(track_ids)
+    print("Number of audio features fetched:", len(features))
 
-    print("all features length: ", len(all_features))
-    for f in all_features[:10]:  # just print 10 tracks for now
+
+    print("all features length: ", len(features))
+    for f in features[:10]:  # just print 10 tracks for now
         if f:
             print(f"Track ID: {f['id']}, valence: {f['valence']}, energy: {f['energy']}")
 
@@ -154,7 +157,7 @@ def generate_playlist():
         return False
 
     # Step 5: Filter and prepare track list
-    filtered_ids = [f['id'] for f in all_features if matches_mood(f) and f.get('id')]
+    filtered_ids = [f['id'] for f in features if matches_mood(f) and f.get('id')]
 
     if not filtered_ids:
         return "No songs matched your mood. Try again!"
