@@ -120,10 +120,18 @@ def generate_playlist():
     print("Track IDs to send:", track_ids)
 
     # Step 3: Call audio_features safely
-    try:
-        features = sp.audio_features(tracks=track_ids)
-    except Exception as e:
-        return f"Spotify API error: {str(e)}"
+    def chunked(iterable, n):
+        for i in range(0, len(iterable), n):
+            yield iterable[i:i + n]
+
+    all_features = []
+    for chunk in chunked(track_ids, 50):
+        try:
+            features = sp.audio_features(tracks=chunk)
+            all_features.extend(features)
+        except Exception as e:
+            print("Chunk failed:", chunk)
+            print("Error:", e)
 
     # Step 4: Define mood filtering
     def matches_mood(f):
