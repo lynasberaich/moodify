@@ -147,7 +147,7 @@ def generate_playlist():
         return False
 
     # Step 5: Filter and prepare track list
-    filtered_ids = [f['id'] for f in features if matches_mood(f) and f.get('id')]
+    filtered_ids = [f['id'] for f in all_features if matches_mood(f) and f.get('id')]
 
     if not filtered_ids:
         return "No songs matched your mood. Try again!"
