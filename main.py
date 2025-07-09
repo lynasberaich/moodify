@@ -93,7 +93,8 @@ def generate_playlist():
     track_ids = [item['track']['id'] for item in saved['items'] if item['track']['id']]
 
     # Step 2: Get audio features
-    features = sp.audio_features(tracks=track_ids)
+    features = sp.audio_features(tracks=track_ids[:100])
+
 
     # Step 3: Define mood filters
     def matches_mood(f):
