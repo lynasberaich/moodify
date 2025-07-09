@@ -14,7 +14,7 @@ app.secret_key = os.urandom(64)
 #from spotify api website
 client_id = '9001e8d19905435598ed117cbb46fd8e'
 client_secret = 'ef0ab8129cba4852948fb4c16ea2b47d'
-redirect_uri = 'https://spotify-api-test-un61.onrender.com/callback'
+redirect_uri = 'https://moodify-9rar.onrender.com/callback'
 scope = 'playlist-read-private'
 
 #manages the session
