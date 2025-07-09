@@ -98,13 +98,18 @@ def generate_playlist():
         track = item.get('track')
         track_id = track.get('id') if track else None
         if track_id and isinstance(track_id, str):
-            track_id_clean = track_id.strip()
-            if re.match(r"^[A-Za-z0-9]+$", track_id_clean):  # only valid chars
-                track_ids.append(track_id_clean)
+            cleaned = track_id.strip()
+            if len(cleaned) == 22 and re.match(r'^[A-Za-z0-9]+$', cleaned):
+                track_ids.append(cleaned)
+
 
     track_ids = track_ids[:100]  # Max 100 allowed
 
     # DEBUG: View cleaned track IDs in logs
+    print("Cleaned track IDs:", track_ids)
+    for tid in track_ids:
+        if ":" in tid:
+            print("❌ Colon found in:", tid)
     print("Track IDs (clean):", track_ids)
     print("Request URL:", f"https://api.spotify.com/v1/audio-features/?ids={','.join(track_ids)}")
 
