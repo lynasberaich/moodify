@@ -90,7 +90,14 @@ def generate_playlist():
 
     # Step 1: Get user's saved tracks (max 100 for now)
     saved = sp.current_user_saved_tracks(limit=50)
-    track_ids = [item['track']['id'] for item in saved['items'] if item['track']['id']]
+    track_ids = [
+        item['track']['id']
+        for item in saved['items']
+        if item.get('track') and item['track'].get('id')
+    ]
+    track_ids = track_ids[:100]
+
+
 
     # Step 2: Get audio features
     features = sp.audio_features(tracks=track_ids[:100])
