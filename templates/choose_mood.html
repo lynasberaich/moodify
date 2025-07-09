@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head><title>Choose Mood</title></head>
+<body>
+  <h2>Select a mood to generate a playlist:</h2>
+  <form action="{{ url_for('generate_playlist') }}" method="POST">
+    <select name="mood">
+      <option value="happy">Happy</option>
+      <option value="sad">Sad</option>
+      <option value="energetic">Energetic</option>
+      <option value="chill">Chill</option>
+    </select>
+    <button type="submit">Generate Playlist</button>
+  </form>
+</body>
+</html>
