@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <title>View Your Spotify Playlists</title>
+</head>
+<body>
+    <h1>View Your Spotify Playlists</h1>
+    <ul>
+        {% for name, link in playlists %}
+        <li><a href="{{link}}" target="_blank">{{name}}</a></li>
+        {% endfor %}
+    </ul>
+    
+</body>
+</html>
