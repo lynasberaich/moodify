@@ -133,6 +133,13 @@ def generate_playlist():
             print("Chunk failed:", chunk)
             print("Error:", e)
 
+    print("all features length: ", len(all_features))
+    for f in all_features[:10]:  # just print 10 tracks for now
+        if f:
+            print(f"Track ID: {f['id']}, valence: {f['valence']}, energy: {f['energy']}")
+
+
+
     # Step 4: Define mood filtering
     def matches_mood(f):
         if not f: return False
