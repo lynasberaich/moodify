@@ -1,4 +1,5 @@
 import os
+import re
 from flask import Flask, request, redirect, session, url_for, render_template
 from spotipy import Spotify
 from spotipy.oauth2 import SpotifyOAuth
@@ -98,10 +99,14 @@ def generate_playlist():
         track_id = track.get('id') if track else None
         if track_id and isinstance(track_id, str):
             track_id_clean = track_id.strip()
-            if track_id_clean.isalnum():  # Only keep valid Spotify IDs
+            if re.match(r"^[A-Za-z0-9]+$", track_id_clean):  # only valid chars
                 track_ids.append(track_id_clean)
 
     track_ids = track_ids[:100]  # Max 100 allowed
+
+    # DEBUG: View cleaned track IDs in logs
+    print("Track IDs (clean):", track_ids)
+    print("Request URL:", f"https://api.spotify.com/v1/audio-features/?ids={','.join(track_ids)}")
 
     if not track_ids:
         return "No valid track IDs found."
