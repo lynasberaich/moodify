@@ -95,7 +95,12 @@ def generate_playlist():
         for item in saved['items']
         if item.get('track') and item['track'].get('id')
     ]
+    for id in track_ids:
+        print(id)
+        
     track_ids = track_ids[:100]
+
+
 
 
 
