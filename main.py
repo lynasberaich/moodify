@@ -52,7 +52,7 @@ def home():
 @app.route('/callback')
 def callback():
     sp_oauth.get_access_token(request.args['code'])
-    return redirect(url_for('get_playlists'))
+    return redirect(url_for('choose_mood'))
 
 #create endpoint for actual task at hand: getting the playlists
 @app.route('/get_playlists')
@@ -88,27 +88,34 @@ def generate_playlist():
     # token_info = cache_handler.get_cached_token()
     # sp = Spotify(auth=token_info['access_token']) <- we already did this globally i think
 
-    # Step 1: Get user's saved tracks (max 100 for now)
+    # Step 1: Get user's saved tracks
     saved = sp.current_user_saved_tracks(limit=50)
-    track_ids = [
-        item['track']['id']
-        for item in saved['items']
-        if item.get('track') and item['track'].get('id')
-    ]
-    print("length of track_ids")
-    print(len(track_ids))
 
-    track_ids = track_ids[:100]
+    # Step 2: Extract and clean track IDs
+    track_ids = []
+    for item in saved['items']:
+        track = item.get('track')
+        track_id = track.get('id') if track else None
+        if track_id and isinstance(track_id, str):
+            track_id_clean = track_id.strip()
+            if track_id_clean.isalnum():  # Only keep valid Spotify IDs
+                track_ids.append(track_id_clean)
 
+    track_ids = track_ids[:100]  # Max 100 allowed
 
+    if not track_ids:
+        return "No valid track IDs found."
 
+    # DEBUG (optional — will show in Render logs)
+    print("Track IDs to send:", track_ids)
 
+    # Step 3: Call audio_features safely
+    try:
+        features = sp.audio_features(tracks=track_ids)
+    except Exception as e:
+        return f"Spotify API error: {str(e)}"
 
-    # Step 2: Get audio features
-    features = sp.audio_features(tracks=track_ids[:100])
-
-
-    # Step 3: Define mood filters
+    # Step 4: Define mood filtering
     def matches_mood(f):
         if not f: return False
         if mood == 'happy':
@@ -121,20 +128,29 @@ def generate_playlist():
             return f['energy'] < 0.4 and 0.4 < f['valence'] < 0.7
         return False
 
-    filtered_ids = [f['id'] for f in features if matches_mood(f)]
+    # Step 5: Filter and prepare track list
+    filtered_ids = [f['id'] for f in features if matches_mood(f) and f.get('id')]
 
     if not filtered_ids:
         return "No songs matched your mood. Try again!"
 
-    # Step 4: Create playlist
+    # Step 6: Create a new playlist
     user_id = sp.current_user()['id']
     playlist = sp.user_playlist_create(user=user_id, name=f'{mood.capitalize()} Vibes 🎧', public=False)
 
-    # Step 5: Add songs to new playlist
-    sp.playlist_add_items(playlist_id=playlist['id'], items=filtered_ids[:100])
+    # Step 7: Add filtered songs to the playlist
+    try:
+        sp.playlist_add_items(playlist_id=playlist['id'], items=filtered_ids[:100])
+    except Exception as e:
+        return f"Error adding songs: {str(e)}"
 
-    return f"Created playlist: <a href='{playlist['external_urls']['spotify']}' target='_blank'>{playlist['name']}</a>"
-
+    # Step 8: Return success message
+    return f"""
+        <h3>Playlist created!</h3>
+        <a href="{playlist['external_urls']['spotify']}" target="_blank">{playlist['name']}</a>
+        <br><br>
+        <a href="/choose_mood">Make another</a> | <a href="/logout">Logout</a>
+    """
 
 
 #logout endpoint
