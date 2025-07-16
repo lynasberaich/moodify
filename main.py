@@ -91,6 +91,9 @@ def generate_playlist():
 
     # Step 1: Get user's saved tracks
     saved = sp.current_user_saved_tracks(limit=50)
+    for item in saved['items']:
+        print(item['track']['name'], item['track']['id'])
+
 
     # Step 2: Extract and clean track IDs
     track_ids = []
