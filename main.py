@@ -79,21 +79,27 @@ def choose_mood():
 #this route generates the playlist based on mood selection
 @app.route('/generate_playlist', methods=['POST'])
 def generate_playlist():
-    #check to see if they are logged in
-    if not sp_oauth.validate_token(cache_handler.get_cached_token()):
-        #get them to log in
-        auth_url = sp_oauth.get_authorize_url()
-        return redirect(auth_url)
+    # Step 0: Recreate auth manager and Spotify client with updated session token
+    sp_oauth = SpotifyOAuth(
+        client_id=client_id,
+        client_secret=client_secret,
+        redirect_uri=redirect_uri,
+        scope=scope,
+        cache_handler=FlaskSessionCacheHandler(session),
+        show_dialog=True
+    )
 
-    mood = request.form.get('mood')
-    # token_info = cache_handler.get_cached_token()
-    # sp = Spotify(auth=token_info['access_token']) <- we already did this globally i think
+    # Check that user is logged in and token is valid
+    if not sp_oauth.validate_token(sp_oauth.cache_handler.get_cached_token()):
+        return redirect(sp_oauth.get_authorize_url())
+
+    token_info = sp_oauth.get_cached_token()
+    sp = Spotify(auth=token_info['access_token'])  # use fresh token here
 
     # Step 1: Get user's saved tracks
     saved = sp.current_user_saved_tracks(limit=50)
     for item in saved['items']:
         print(item['track']['name'], item['track']['id'])
-
 
     # Step 2: Extract and clean track IDs
     track_ids = []
@@ -104,26 +110,15 @@ def generate_playlist():
             cleaned = track_id.strip()
             if len(cleaned) == 22 and re.match(r'^[A-Za-z0-9]+$', cleaned):
                 track_ids.append(cleaned)
+    track_ids = track_ids[:100]
 
-
-    track_ids = track_ids[:100]  # Max 100 allowed
-
-    # DEBUG: View cleaned track IDs in logs
     print("Cleaned track IDs:", track_ids)
-    for tid in track_ids:
-        if ":" in tid:
-            print("❌ Colon found in:", tid)
-    print("Track IDs (clean):", track_ids)
     print("Request URL:", f"https://api.spotify.com/v1/audio-features/?ids={','.join(track_ids)}")
 
     if not track_ids:
         return "No valid track IDs found."
 
-    # DEBUG (optional — will show in Render logs)
-    print("Track IDs to send:", track_ids)
-
-    # Step 3: Call audio_features safely
-    # Batch audio features into groups of max 100
+    # Step 3: Fetch audio features
     def get_audio_features_batch(track_ids):
         features = []
         for i in range(0, len(track_ids), 100):
@@ -137,16 +132,12 @@ def generate_playlist():
 
     features = get_audio_features_batch(track_ids)
     print("Number of audio features fetched:", len(features))
-
-
-    print("all features length: ", len(features))
-    for f in features[:10]:  # just print 10 tracks for now
+    for f in features[:10]:
         if f:
             print(f"Track ID: {f['id']}, valence: {f['valence']}, energy: {f['energy']}")
 
-
-
-    # Step 4: Define mood filtering
+    # Step 4: Filter by mood
+    mood = request.form.get('mood')
     def matches_mood(f):
         if not f: return False
         if mood == 'happy':
@@ -159,29 +150,29 @@ def generate_playlist():
             return f['energy'] < 0.4 and 0.4 < f['valence'] < 0.7
         return False
 
-    # Step 5: Filter and prepare track list
     filtered_ids = [f['id'] for f in features if matches_mood(f) and f.get('id')]
 
     if not filtered_ids:
         return "No songs matched your mood. Try again!"
 
-    # Step 6: Create a new playlist
+    # Step 5: Create playlist
     user_id = sp.current_user()['id']
     playlist = sp.user_playlist_create(user=user_id, name=f'{mood.capitalize()} Vibes 🎧', public=False)
 
-    # Step 7: Add filtered songs to the playlist
+    # Step 6: Add tracks to playlist
     try:
         sp.playlist_add_items(playlist_id=playlist['id'], items=filtered_ids[:100])
     except Exception as e:
         return f"Error adding songs: {str(e)}"
 
-    # Step 8: Return success message
+    # Step 7: Return success
     return f"""
         <h3>Playlist created!</h3>
         <a href="{playlist['external_urls']['spotify']}" target="_blank">{playlist['name']}</a>
         <br><br>
         <a href="/choose_mood">Make another</a> | <a href="/logout">Logout</a>
     """
+
 
 
 #logout endpoint
