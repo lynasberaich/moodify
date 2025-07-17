@@ -79,22 +79,21 @@ def choose_mood():
 #this route generates the playlist based on mood selection
 @app.route('/generate_playlist', methods=['POST'])
 def generate_playlist():
-    # Step 0: Recreate auth manager and Spotify client with updated session token
+    # Step 0: Create a fresh auth manager and client
     sp_oauth = SpotifyOAuth(
         client_id=client_id,
         client_secret=client_secret,
         redirect_uri=redirect_uri,
         scope=scope,
-        cache_handler=FlaskSessionCacheHandler(session),
-        show_dialog=True
+        cache_handler=FlaskSessionCacheHandler(session)
     )
 
-    # Check that user is logged in and token is valid
-    if not sp_oauth.validate_token(sp_oauth.cache_handler.get_cached_token()):
+    token_info = sp_oauth.get_cached_token()
+    if not sp_oauth.validate_token(token_info):
         return redirect(sp_oauth.get_authorize_url())
 
-    token_info = sp_oauth.get_cached_token()
-    sp = Spotify(auth=token_info['access_token'])  # use fresh token here
+    access_token = token_info['access_token']
+    sp = Spotify(auth=access_token)  # THIS is the working client
 
     # Step 1: Get user's saved tracks
     saved = sp.current_user_saved_tracks(limit=50)
