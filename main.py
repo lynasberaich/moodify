@@ -89,14 +89,17 @@ def generate_playlist():
     )
 
     token_info = sp_oauth.get_cached_token()
-    if not sp_oauth.validate_token(token_info):
+    if not token_info or not sp_oauth.validate_token(token_info):
+        print("Invalid or missing token. Redirecting to login.")
         return redirect(sp_oauth.get_authorize_url())
 
     access_token = token_info['access_token']
-    sp = Spotify(auth=access_token)  # THIS is the working client
+    sp_local = Spotify(auth=access_token)  # THIS is the working client
+    print("Current token scopes:", sp_local.current_user()['product'])  # triggers a simple check
+
 
     # Step 1: Get user's saved tracks
-    saved = sp.current_user_saved_tracks(limit=50)
+    saved = sp_local.current_user_saved_tracks(limit=50)
     for item in saved['items']:
         print(item['track']['name'], item['track']['id'])
 
@@ -123,7 +126,7 @@ def generate_playlist():
         for i in range(0, len(track_ids), 100):
             batch = track_ids[i:i + 100]
             try:
-                batch_features = sp.audio_features(batch)
+                batch_features = sp_local.audio_features(batch)
                 features.extend(batch_features)
             except Exception as e:
                 print(f"Error fetching audio features for batch {i // 100 + 1}: {e}")
@@ -155,12 +158,12 @@ def generate_playlist():
         return "No songs matched your mood. Try again!"
 
     # Step 5: Create playlist
-    user_id = sp.current_user()['id']
-    playlist = sp.user_playlist_create(user=user_id, name=f'{mood.capitalize()} Vibes 🎧', public=False)
+    user_id = sp_local.current_user()['id']
+    playlist = sp_local.user_playlist_create(user=user_id, name=f'{mood.capitalize()} Vibes 🎧', public=False)
 
     # Step 6: Add tracks to playlist
     try:
-        sp.playlist_add_items(playlist_id=playlist['id'], items=filtered_ids[:100])
+        sp_local.playlist_add_items(playlist_id=playlist['id'], items=filtered_ids[:100])
     except Exception as e:
         return f"Error adding songs: {str(e)}"
 
