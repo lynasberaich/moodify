@@ -16,7 +16,7 @@ app.secret_key = os.urandom(64)
 client_id = '9001e8d19905435598ed117cbb46fd8e'
 client_secret = 'ef0ab8129cba4852948fb4c16ea2b47d'
 redirect_uri = 'https://moodify-9rar.onrender.com/callback'
-scope = 'playlist-read-private user-library-read playlist-modify-private playlist-modify-public'
+scope = 'playlist-read-private user-library-read playlist-modify-private playlist-modify-public user-read-private'
 
 
 #manages the session
@@ -95,7 +95,7 @@ def generate_playlist():
 
     access_token = token_info['access_token']
     sp_local = Spotify(auth=access_token)  # THIS is the working client
-    print("Current token scopes:", sp_local.current_user()['product'])  # triggers a simple check
+    print("Logged in as:", sp_local.current_user().get('display_name'))  # triggers a simple check
 
 
     # Step 1: Get user's saved tracks
