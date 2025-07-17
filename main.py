@@ -122,11 +122,14 @@ def generate_playlist():
 
     # Step 3: Fetch audio features
     def get_audio_features_batch(track_ids):
+        token_info = sp_oauth.get_cached_token()
+        sp = Spotify(auth=token_info['access_token'])
+
         features = []
         for i in range(0, len(track_ids), 100):
             batch = track_ids[i:i + 100]
             try:
-                batch_features = sp_local.audio_features(batch)
+                batch_features = sp.audio_features(batch)
                 features.extend(batch_features)
             except Exception as e:
                 print(f"Error fetching audio features for batch {i // 100 + 1}: {e}")
@@ -158,6 +161,8 @@ def generate_playlist():
         return "No songs matched your mood. Try again!"
 
     # Step 5: Create playlist
+    token_info = sp_oauth.get_cached_token()
+    print("✅ Token scopes:", token_info.get("scope"))
     user_id = sp_local.current_user()['id']
     playlist = sp_local.user_playlist_create(user=user_id, name=f'{mood.capitalize()} Vibes 🎧', public=False)
 
